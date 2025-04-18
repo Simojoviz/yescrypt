@@ -49,6 +49,8 @@
 #define YESCRYPT_INTERNAL
 #include "yescrypt.h"
 
+#include <stdio.h>
+
 static void blkcpy(uint32_t *dst, const uint32_t *src, size_t count)
 {
 	do {
@@ -323,6 +325,7 @@ static void smix1(uint32_t *B, size_t r, uint64_t N, yescrypt_flags_t flags,
 	uint32_t *Y = &XY[s];
 	uint64_t i, j;
 	size_t k;
+	printf("SMIX1\n");
 
 	/* 1: X <-- B */
 	for (k = 0; k < 2 * r; k++)
@@ -333,6 +336,9 @@ static void smix1(uint32_t *B, size_t r, uint64_t N, yescrypt_flags_t flags,
 	for (i = 0; i < N; i++) {
 		/* 3: V_i <-- X */
 		blkcpy(&V[i * s], X, s);
+		//LOG
+		if (ctx)
+			printf("%p\n", &V[i * s]);
 
 		if (VROM && i == 0) {
 			/* X <-- X xor VROM_{NROM-1} */
@@ -380,6 +386,7 @@ static void smix2(uint32_t *B, size_t r, uint64_t N, uint64_t Nloop,
 	uint32_t *Y = &XY[s];
 	uint64_t i, j;
 	size_t k;
+	printf("SMIX2\n");
 
 	/* X <-- B */
 	for (k = 0; k < 2 * r; k++)
@@ -400,6 +407,8 @@ static void smix2(uint32_t *B, size_t r, uint64_t N, uint64_t Nloop,
 
 			/* 8.1: X <-- X xor V_j */
 			blkxor(X, &V[j * s], s);
+			//LOG
+			//printf("%p\n", &V[j * s]);
 			/* V_j <-- X */
 			if (flags & YESCRYPT_RW)
 				blkcpy(&V[j * s], X, s);
@@ -656,6 +665,7 @@ static int yescrypt_kdf_body(const yescrypt_shared_t *shared,
 	}
 
 	if (flags) {
+		printf("%s\n", flags & YESCRYPT_PREHASH ? "yescrypt-prehash" : "yescrypt");
 		HMAC_SHA256_Buf("yescrypt-prehash",
 		    (flags & YESCRYPT_PREHASH) ? 16 : 8,
 		    passwd, passwdlen, (uint8_t *)sha256);
@@ -663,6 +673,7 @@ static int yescrypt_kdf_body(const yescrypt_shared_t *shared,
 		passwdlen = sizeof(sha256);
 	}
 
+	printf("Vp: %p\n", V);
 	/* 1: (B_0 ... B_{p-1}) <-- PBKDF2(P, S, 1, p * MFLen) */
 	PBKDF2_SHA256(passwd, passwdlen, salt, saltlen, 1,
 	    (uint8_t *)B, B_size);
@@ -750,6 +761,7 @@ int yescrypt_kdf(const yescrypt_shared_t *shared, yescrypt_local_t *local,
     const yescrypt_params_t *params,
     uint8_t *buf, size_t buflen)
 {
+	printf("YESCRYPT-REF\n\n");
 	yescrypt_flags_t flags = params->flags;
 	uint64_t N = params->N;
 	uint32_t r = params->r;

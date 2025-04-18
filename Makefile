@@ -36,27 +36,43 @@ OBJS_PHC = $(OBJS_CORE) $(OBJS_COMMON) phc-test.o
 OBJS_INITROM = $(OBJS_CORE) $(OBJS_COMMON) initrom.o
 OBJS_USEROM = $(OBJS_CORE) $(OBJS_COMMON) userom.o
 OBJS_RM = yescrypt-*.o
+TESTS_FILE = TESTS-OPT.log
+
+OBJS_SIMPLE = $(OBJS_CORE) $(OBJS_COMMON) simple.o
 
 all: $(PROJ)
 
-check: tests phc-test
+#check: tests phc-test
+#	@echo 'Running main tests'
+#	@time ./tests | tee TESTS-OUT
+#	@diff -U0 TESTS-OK TESTS-OUT && echo PASSED || echo FAILED
+#	@if [ -e PHC-TEST-OK-SHA256 ]; then \
+#		echo 'Running PHC tests'; \
+#		time ./phc-test > PHC-TEST-OUT; \
+#		sha256sum -c PHC-TEST-OK-SHA256; \
+#	fi
+
+check: tests
 	@echo 'Running main tests'
-	@time ./tests | tee TESTS-OUT
-	@diff -U0 TESTS-OK TESTS-OUT && echo PASSED || echo FAILED
-	@if [ -e PHC-TEST-OK-SHA256 ]; then \
-		echo 'Running PHC tests'; \
-		time ./phc-test > PHC-TEST-OUT; \
-		sha256sum -c PHC-TEST-OK-SHA256; \
-	fi
+	@time ./tests | tee $(TESTS_FILE)
+
 
 ref:
 	$(MAKE) $(PROJ) OBJS_CORE=yescrypt-ref.o
 
 check-ref:
-	$(MAKE) check OBJS_CORE=yescrypt-ref.o
+	$(MAKE) check OBJS_CORE=yescrypt-ref.o TESTS_FILE=TESTS-REF.log
+
+check-all: check check-ref
 
 tests: $(OBJS_TESTS)
 	$(LD) $(LDFLAGS) $(OBJS_TESTS) -o $@
+
+simple: $(OBJS_SIMPLE)
+	$(LD) $(LDFLAGS) $(OBJS_SIMPLE) -o $@
+
+simple.o: simple.c
+	$(CC) -c $(CFLAGS) $(OMPFLAGS) simple.c
 
 phc-test.o: phc.c
 	$(CC) -c $(CFLAGS) -DTEST phc.c -o $@

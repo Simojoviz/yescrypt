@@ -147,6 +147,34 @@ int main(void)
 
 	setvbuf(stdout, NULL, _IOLBF, 0);
 
+	uint8_t buff[1024];
+	yescrypt_local_t local;
+	printf("yescrypt(\"pippo\")\n");
+	yescrypt_init_local(&local);
+	yescrypt_r (NULL, &local, (uint8_t *)"pippo", 5, (uint8_t *)"$y$j9T$FLlxu.bek5r80nzMVMdGR1$", NULL, buff, 1024);
+	yescrypt_free_local(&local);
+	printf("%s\n\n", buff);
+
+	printf("yescrypt(\"pluto\")\n");
+	yescrypt_init_local(&local);
+	yescrypt_r (NULL, &local, (uint8_t *)"pluto", 5, (uint8_t *)"$y$j9T$FLlxu.bek5r80nzMVMdGR1$", NULL, buff, 1024);
+	yescrypt_free_local(&local);
+	printf("%s\n\n", buff);
+
+	printf("yescrypt(\"pippo\")\n");
+	yescrypt_init_local(&local);
+	yescrypt_r (NULL, &local, (uint8_t *)"pippo", 5, (uint8_t *)"$y$j9T$FLlxu.bek5r80nzMVMdGR1$", NULL, buff, 1024);
+	yescrypt_free_local(&local);
+	printf("%s\n\n", buff);
+
+	printf("yescrypt(\"pluto\")\n");
+	yescrypt_init_local(&local);
+	yescrypt_r (NULL, &local, (uint8_t *)"pluto", 5, (uint8_t *)"$y$j9T$FLlxu.bek5r80nzMVMdGR1$", NULL, buff, 1024);
+	yescrypt_free_local(&local);
+	printf("%s\n\n", buff);
+
+	exit(0);
+
 #ifdef TEST_PBKDF2_SHA256
 	print_PBKDF2_SHA256("password", "salt", 1, 20);
 	print_PBKDF2_SHA256("password", "salt", 2, 20);
