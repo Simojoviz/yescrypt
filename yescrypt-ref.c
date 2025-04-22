@@ -337,7 +337,7 @@ static void smix1(uint32_t *B, size_t r, uint64_t N, yescrypt_flags_t flags,
 		/* 3: V_i <-- X */
 		blkcpy(&V[i * s], X, s);
 		//LOG
-		if (ctx)
+		//if (ctx)
 			printf("%p\n", &V[i * s]);
 
 		if (VROM && i == 0) {

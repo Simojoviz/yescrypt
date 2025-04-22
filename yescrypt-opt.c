@@ -34,6 +34,7 @@
  * sub-block), and much less so for YESCRYPT_RW (which uses 2 rounds of Salsa20
  * per block except during pwxform S-box initialization).
  */
+#include <stdio.h>
 #ifdef __GNUC__
 #ifdef __XOP__
 #warning "Note: XOP is enabled.  That's great."
@@ -94,8 +95,6 @@
 
 #include "yescrypt-platform.c"
 
-#include <stdio.h>
-
 #if __STDC_VERSION__ >= 199901L
 /* Have restrict */
 #elif defined(__GNUC__)
@@ -127,6 +126,8 @@ typedef union {
 static inline void salsa20_simd_shuffle(const salsa20_blk_t *Bin,
     salsa20_blk_t *Bout)
 {
+	//printf("R salsa20_simd_shuffle: %p, %d\n", Bin, 512);
+	//printf("W salsa20_simd_shuffle: %p, %d\n", Bout, 512);
 #define COMBINE(out, in1, in2) \
 	Bout->d[out] = Bin->w[in1 * 2] | ((uint64_t)Bin->w[in2 * 2 + 1] << 32);
 	COMBINE(0, 0, 2)
@@ -143,6 +144,8 @@ static inline void salsa20_simd_shuffle(const salsa20_blk_t *Bin,
 static inline void salsa20_simd_unshuffle(const salsa20_blk_t *Bin,
     salsa20_blk_t *Bout)
 {
+	printf("R salsa20_simd_unshuffle: %p, %d\n", Bin, 512);
+	printf("W salsa20_simd_unshuffle: %p, %d\n", Bout, 512);
 #define UNCOMBINE(out, in1, in2) \
 	Bout->w[out * 2] = Bin->d[in1]; \
 	Bout->w[out * 2 + 1] = Bin->d[in2] >> 32;
@@ -374,6 +377,8 @@ static inline void salsa20(salsa20_blk_t *restrict B,
 static void blockmix_salsa8(const salsa20_blk_t *restrict Bin,
     salsa20_blk_t *restrict Bout, size_t r)
 {
+	//printf("R blockmix_salsa8: %p, %d\n", Bin, 512);
+	printf("W blockmix_salsa8: %p, %d\n", Bout, 512);
 	size_t i;
 	DECL_X
 
@@ -644,6 +649,9 @@ typedef struct {
 static void blockmix(const salsa20_blk_t *restrict Bin,
     salsa20_blk_t *restrict Bout, size_t r, pwxform_ctx_t *restrict ctx)
 {
+
+	//printf("R blockmix: %p, %d\n", Bin, 512);
+	printf("W blockmix: %p, %d\n", Bout, 512);
 	uint8_t *S0 = ctx->S0, *S1 = ctx->S1, *S2 = ctx->S2;
 	size_t w = ctx->w;
 	size_t i;
@@ -676,6 +684,9 @@ static uint32_t blockmix_xor(const salsa20_blk_t *Bin1,
     const salsa20_blk_t *restrict Bin2, salsa20_blk_t *Bout,
     size_t r, int Bin2_in_ROM, pwxform_ctx_t *restrict ctx)
 {
+	//printf("R blockmix_xor: %p, %d\n", Bin1, 512);
+	//printf("R blockmix_xor: %p, %d\n", Bin2, 512);
+	printf("W blockmix_xor: %p, %d\n", Bout, 512);
 	uint8_t *S0 = ctx->S0, *S1 = ctx->S1, *S2 = ctx->S2;
 	size_t w = ctx->w;
 	size_t i;
@@ -737,6 +748,9 @@ static uint32_t blockmix_xor_save(salsa20_blk_t *restrict Bin1out,
     salsa20_blk_t *restrict Bin2,
     size_t r, pwxform_ctx_t *restrict ctx)
 {
+	printf("R blockmix_xor_save: %p, %d\n", Bin1out, 512);
+	printf("R blockmix_xor_save: %p, %d\n", Bin2, 512);
+	printf("W blockmix_xor_save: %p, %d\n", Bin1out, 512);
 	uint8_t *S0 = ctx->S0, *S1 = ctx->S1, *S2 = ctx->S2;
 	size_t w = ctx->w;
 	size_t i;
@@ -796,6 +810,8 @@ static inline uint32_t integerify(const salsa20_blk_t *B, size_t r)
  * SIMD-shuffled (so the next 32 bits would be part of d[6]), but currently
  * this does not matter as we only care about the least significant 32 bits.
  */
+
+	printf("R integerify: %p, %d\n", B, 512);
 	return (uint32_t)B[2 * r - 1].d[0];
 }
 
@@ -814,23 +830,25 @@ static void smix1(uint8_t *B, size_t r, uint32_t N, yescrypt_flags_t flags,
 	size_t s = 2 * r;
 	salsa20_blk_t *X = V, *Y = &V[s];
 	uint32_t i, j;
-	printf("SMIX1\n");
 
 	for (i = 0; i < 2 * r; i++) {
 		const salsa20_blk_t *src = (salsa20_blk_t *)&B[i * 64];
 		salsa20_blk_t *tmp = Y;
 		salsa20_blk_t *dst = &X[i];
 		size_t k;
-		for (k = 0; k < 16; k++)
+		for (k = 0; k < 16; k++) 
 			tmp->w[k] = le32dec(&src->w[k]);
+		// printf("W le/*  */32dec: %p, %d\n", tmp, 512);
 		salsa20_simd_shuffle(tmp, dst);
 	}
+
 	if (VROM) {
 		uint32_t n;
 		const salsa20_blk_t *V_j;
 
 		V_j = &VROM[(NROM - 1) * s];
 		j = blockmix_xor(X, V_j, Y, r, 1, ctx) & (NROM - 1);
+		
 		V_j = &VROM[j * s];
 		X = Y + s;
 		j = blockmix_xor(Y, V_j, X, r, 1, ctx);
@@ -843,6 +861,7 @@ static void smix1(uint8_t *B, size_t r, uint32_t N, yescrypt_flags_t flags,
 				V_j = &V[j * s];
 				Y = X + s;
 				j = blockmix_xor(X, V_j, Y, r, 0, ctx) & (NROM - 1);
+
 				V_j = &VROM[j * s];
 				X = Y + s;
 				j = blockmix_xor(Y, V_j, X, r, 1, ctx);
@@ -861,19 +880,15 @@ static void smix1(uint8_t *B, size_t r, uint32_t N, yescrypt_flags_t flags,
 		uint32_t n;
 		salsa20_blk_t *V_j;
 
-		//printf("%p\n", X);
 		blockmix(X, Y, r, ctx);
 		X = Y + s;
 		blockmix(Y, X, r, ctx);
 		j = integerify(X, r);
-		//printf("%p\n", Y);
 
 		for (n = 2; n < N; n <<= 1) {
 			uint32_t m = (n < N / 2) ? n : (N - 1 - n);
 			for (i = 1; i < m; i += 2) {
-				//printf("%p\n", X);
 				Y = X + s;
-				//printf("%p\n", Y);
 				j &= n - 1;
 				j += i - 1;
 				V_j = &V[j * s];
@@ -887,12 +902,10 @@ static void smix1(uint8_t *B, size_t r, uint32_t N, yescrypt_flags_t flags,
 		}
 		n >>= 1;
 
-		//printf("%p\n", X);
 		j &= n - 1;
 		j += N - 2 - n;
 		V_j = &V[j * s];
 		Y = X + s;
-		//printf("%p\n", Y);
 		j = blockmix_xor(X, V_j, Y, r, 0, ctx);
 		j &= n - 1;
 		j += N - 1 - n;
@@ -901,18 +914,14 @@ static void smix1(uint8_t *B, size_t r, uint32_t N, yescrypt_flags_t flags,
 	} else {
 		N -= 2;
 		do {
-			//printf("%p\n", X);
 			blockmix_salsa8(X, Y, r);
 			X = Y + s;
-			//printf("%p\n", Y);
 			blockmix_salsa8(Y, X, r);
 			Y = X + s;
 		} while ((N -= 2));
-		//printf("%p\n", X);
-		blockmix_salsa8(X, Y, r);
-		//printf("%p\n", Y);
-		blockmix_salsa8(Y, XY, r);
 
+		blockmix_salsa8(X, Y, r);
+		blockmix_salsa8(Y, XY, r);
 	}
 
 	for (i = 0; i < 2 * r; i++) {
@@ -922,6 +931,7 @@ static void smix1(uint8_t *B, size_t r, uint32_t N, yescrypt_flags_t flags,
 		size_t k;
 		for (k = 0; k < 16; k++)
 			le32enc(&tmp->w[k], src->w[k]);
+		// printf("W le32enc: %p, %d\n", tmp, 512);
 		salsa20_simd_unshuffle(tmp, dst);
 	}
 }
@@ -941,7 +951,6 @@ static void smix2(uint8_t *B, size_t r, uint32_t N, uint64_t Nloop,
 	size_t s = 2 * r;
 	salsa20_blk_t *X = XY, *Y = &XY[s];
 	uint32_t i, j;
-	printf("SMIX2\n");
 
 	if (Nloop == 0)
 		return;
@@ -953,6 +962,7 @@ static void smix2(uint8_t *B, size_t r, uint32_t N, uint64_t Nloop,
 		size_t k;
 		for (k = 0; k < 16; k++)
 			tmp->w[k] = le32dec(&src->w[k]);
+		// printf("W le32dec: %p, %d\n", tmp, 512);
 		salsa20_simd_shuffle(tmp, dst);
 	}
 
@@ -964,6 +974,7 @@ static void smix2(uint8_t *B, size_t r, uint32_t N, uint64_t Nloop,
  * entire V when p > 1.
  */
 	if (VROM && (flags & YESCRYPT_RW)) {
+		printf("# smix2 vrom && flags\n");
 		do {
 			salsa20_blk_t *V_j = &V[j * s];
 			const salsa20_blk_t *VROM_j;
@@ -972,6 +983,7 @@ static void smix2(uint8_t *B, size_t r, uint32_t N, uint64_t Nloop,
 			j = blockmix_xor(X, VROM_j, X, r, 1, ctx) & (N - 1);
 		} while (Nloop -= 2);
 	} else if (VROM) {
+		printf("# smix2 vrom\n");
 		do {
 			const salsa20_blk_t *V_j = &V[j * s];
 			j = blockmix_xor(X, V_j, X, r, 0, ctx) & (NROM - 1);
@@ -979,6 +991,8 @@ static void smix2(uint8_t *B, size_t r, uint32_t N, uint64_t Nloop,
 			j = blockmix_xor(X, V_j, X, r, 1, ctx) & (N - 1);
 		} while (Nloop -= 2);
 	} else if (flags & YESCRYPT_RW) {
+		printf("# smix2 flags\n");
+		// NOTE: only this is used
 		do {
 			salsa20_blk_t *V_j = &V[j * s];
 			j = blockmix_xor_save(X, V_j, r, ctx) & (N - 1);
@@ -986,6 +1000,7 @@ static void smix2(uint8_t *B, size_t r, uint32_t N, uint64_t Nloop,
 			j = blockmix_xor_save(X, V_j, r, ctx) & (N - 1);
 		} while (Nloop -= 2);
 	} else if (ctx) {
+		printf("# smix2 ctx\n");
 		do {
 			const salsa20_blk_t *V_j = &V[j * s];
 			j = blockmix_xor(X, V_j, X, r, 0, ctx) & (N - 1);
@@ -993,6 +1008,7 @@ static void smix2(uint8_t *B, size_t r, uint32_t N, uint64_t Nloop,
 			j = blockmix_xor(X, V_j, X, r, 0, ctx) & (N - 1);
 		} while (Nloop -= 2);
 	} else {
+		printf("# smix2 else\n");
 		do {
 			const salsa20_blk_t *V_j = &V[j * s];
 			j = blockmix_salsa8_xor(X, V_j, Y, r) & (N - 1);
@@ -1008,6 +1024,7 @@ static void smix2(uint8_t *B, size_t r, uint32_t N, uint64_t Nloop,
 		size_t k;
 		for (k = 0; k < 16; k++)
 			le32enc(&tmp->w[k], src->w[k]);
+		// printf("W le32enc: %p, %d\n", tmp, 512);
 		salsa20_simd_unshuffle(tmp, dst);
 	}
 }
@@ -1089,6 +1106,7 @@ static void smix(uint8_t *B, size_t r, uint32_t N, uint32_t p, uint32_t t,
 		pwxform_ctx_t *ctx_i = NULL;
 		if (flags & YESCRYPT_RW) {
 			uint8_t *Si = S + i * Salloc;
+			printf("# smix 1.1\n");
 			smix1(Bp, 1, Sbytes / 128, 0 /* no flags */,
 			    (salsa20_blk_t *)Si, 0, NULL, XYp, NULL);
 			ctx_i = (pwxform_ctx_t *)(Si + Sbytes);
@@ -1096,11 +1114,16 @@ static void smix(uint8_t *B, size_t r, uint32_t N, uint32_t p, uint32_t t,
 			ctx_i->S1 = Si + Sbytes / 3;
 			ctx_i->S0 = Si + Sbytes / 3 * 2;
 			ctx_i->w = 0;
-			if (i == 0)
-				HMAC_SHA256_Buf(Bp + (128 * r - 64), 64,
-				    passwd, 32, passwd);
+			if (i == 0) {
+				HMAC_SHA256_Buf(Bp + (128 * r - 64), 64, passwd, 32, passwd);
+				printf("R HMAC_SHA256_Buf: %p, %d\n", Bp + (128 * r - 64), 64);
+				// printf("R HMAC_SHA256_Buf: %p, %d\n", passwd, 32);
+				// printf("W HMAC_SHA256_Buf: %p, %d\n", passwd, 32);
+			}
 		}
+		printf("# smix 1.2\n");
 		smix1(Bp, r, Np, flags, Vp, NROM, VROM, XYp, ctx_i);
+		printf("# smix 2.1\n");
 		smix2(Bp, r, p2floor(Np), Nloop_rw, flags, Vp,
 		    NROM, VROM, XYp, ctx_i);
 	}
@@ -1121,6 +1144,7 @@ static void smix(uint8_t *B, size_t r, uint32_t N, uint32_t p, uint32_t t,
 				uint8_t *Si = S + i * Salloc;
 				ctx_i = (pwxform_ctx_t *)(Si + Sbytes);
 			}
+			// NOTE: not used
 			smix2(Bp, r, N, Nloop_all - Nloop_rw,
 			    flags & ~YESCRYPT_RW, V, NROM, VROM, XYp, ctx_i);
 		}
@@ -1280,35 +1304,52 @@ static int yescrypt_kdf_body(const yescrypt_shared_t *shared,
 		if (local->aligned_size < need) {
 			if (free_region(local))
 				return -1;
+			// NOTE: This is the only one used, others not triggered
 			if (!alloc_region(local, need))
 				return -1;
 		}
-		if (flags & YESCRYPT_ALLOC_ONLY)
+		if (flags & YESCRYPT_ALLOC_ONLY) {
+			printf("# alloc only\n");
 			return -3; /* expected "failure" */
+		}
 		B = (uint8_t *)local->aligned;
 		V = (salsa20_blk_t *)((uint8_t *)B + B_size);
 		XY = (salsa20_blk_t *)((uint8_t *)V + V_size);
+
+		printf("# array offsets:\n");
+		printf("#   B:  0 ~ %ld (%ld)\n", B_size, B_size);
+		printf("#   V:  %ld ~ %ld (%ld)\n", B_size, B_size + V_size, V_size);
+		printf("#   XY: %ld ~ %ld (%ld)\n", B_size + V_size, B_size + V_size + XY_size, XY_size);
+		printf("#   S:  %ld ~ %ld (%ld)\n", B_size + V_size + XY_size, need, need - B_size - V_size - XY_size);
 	}
+
 	S = NULL;
 	if (flags & YESCRYPT_RW)
 		S = (uint8_t *)XY + XY_size;
 
+	uint8_t *base1 = (uint8_t *)local->aligned;
+	for(int i = 0; i < 16801856; i++) {
+		base1[i] = 42;
+	}
+
 	if (flags) {
-		printf("%s\n", flags & YESCRYPT_PREHASH ? "yescrypt-prehash" : "yescrypt");
+		printf("# prehash\n");
 		HMAC_SHA256_Buf("yescrypt-prehash",
 		    (flags & YESCRYPT_PREHASH) ? 16 : 8,
 		    passwd, passwdlen, sha256);
 		passwd = sha256;
 		passwdlen = sizeof(sha256);
 	}
-	printf("Vp: %p\n", V);
 
 	PBKDF2_SHA256(passwd, passwdlen, salt, saltlen, 1, B, B_size);
+	printf("W PBKDF2_SHA256: %p, %ld\n", B, B_size);
 
 	if (flags)
 		memcpy(sha256, B, sizeof(sha256));
 
 	if (p == 1 || (flags & YESCRYPT_RW)) {
+		// NOTE: only this is used
+		// VROM is NULL
 		smix(B, r, N, p, t, flags, V, NROM, VROM, XY, S, sha256);
 	} else {
 		uint32_t i;
@@ -1331,10 +1372,12 @@ static int yescrypt_kdf_body(const yescrypt_shared_t *shared,
 	dkp = buf;
 	if (flags && buflen < sizeof(dk)) {
 		PBKDF2_SHA256(passwd, passwdlen, B, B_size, 1, dk, sizeof(dk));
+		printf("R PBKDF2_SHA256: %p, %ld\n", B, B_size);
 		dkp = dk;
 	}
 
 	PBKDF2_SHA256(passwd, passwdlen, B, B_size, 1, buf, buflen);
+	printf("R PBKDF2_SHA256: %p, %ld\n", B, B_size);
 
 	/*
 	 * Except when computing classic scrypt, allow all computation so far
@@ -1366,6 +1409,8 @@ static int yescrypt_kdf_body(const yescrypt_shared_t *shared,
 		return -1;
 	}
 
+	printf("# end\n");
+
 	/* Success! */
 	return 0;
 
@@ -1387,7 +1432,6 @@ int yescrypt_kdf(const yescrypt_shared_t *shared, yescrypt_local_t *local,
     const yescrypt_params_t *params,
     uint8_t *buf, size_t buflen)
 {
-	printf("YESCRYPT-OPT\n\n");
 	yescrypt_flags_t flags = params->flags;
 	uint64_t N = params->N;
 	uint32_t r = params->r;
@@ -1406,6 +1450,7 @@ int yescrypt_kdf(const yescrypt_shared_t *shared, yescrypt_local_t *local,
 
 	if ((flags & (YESCRYPT_RW | YESCRYPT_INIT_SHARED)) == YESCRYPT_RW &&
 	    p >= 1 && N / p >= 0x100 && N / p * r >= 0x20000) {
+		printf("# try 1\n");
 		if (yescrypt_kdf_body(shared, local,
 		    passwd, passwdlen, salt, saltlen,
 		    flags | YESCRYPT_ALLOC_ONLY, N, r, p, t, NROM,
@@ -1413,6 +1458,7 @@ int yescrypt_kdf(const yescrypt_shared_t *shared, yescrypt_local_t *local,
 			errno = EINVAL;
 			return -1;
 		}
+		printf("# try 2\n");
 		if ((retval = yescrypt_kdf_body(shared, local,
 		    passwd, passwdlen, salt, saltlen,
 		    flags | YESCRYPT_PREHASH, N >> 6, r, p, 0, NROM,
@@ -1422,9 +1468,25 @@ int yescrypt_kdf(const yescrypt_shared_t *shared, yescrypt_local_t *local,
 		passwdlen = sizeof(dk);
 	}
 
+	// for(int i = 0; i < passwdlen; i++) printf("%02x ", passwd[i]);
+	// printf("\n");
+
+	printf("# try 3\n");
 	retval = yescrypt_kdf_body(shared, local,
 	    passwd, passwdlen, salt, saltlen,
 	    flags, N, r, p, t, NROM, buf, buflen);
+
+	// printf("# dump ");
+	// uint8_t *base = (uint8_t *)local->base;
+	// for(int i = 0; i < 16801856; i++) printf("%02x ", base[i]);
+	// printf("\n");
+
+
+	// for(long int i = 0; i < 16801856; i++) {
+	// 	printf("%02x ", ((uint8_t *) local->base)[i]);
+	// }
+	// printf("\n");
+
 #ifndef SKIP_MEMZERO
 	if (passwd == dk)
 		insecure_memzero(dk, sizeof(dk));
