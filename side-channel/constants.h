@@ -1,0 +1,8 @@
+#define L3_SIZE 25165824
+#define L3_ASSOC 12
+#define L3_LINEZIZE 64
+#define L3_WAYSIZE (L3_SIZE / L3_ASSOC)
+#define L3_SETS (L3_WAYSIZE / 64)
+#define L3_INDEX_MASK (0x7FFF << 6)
+
+#define L3_CACHE_SET 0x40

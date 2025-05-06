@@ -1,0 +1,6 @@
+.vscode
+*.o
+*.so
+*.bin
+side-channel/ghi*
+**.gdb.history

@@ -21,65 +21,47 @@ LD = $(CC)
 RM = rm -f
 OMPFLAGS = -fopenmp
 OMPFLAGS_MAYBE = $(OMPFLAGS)
-#CFLAGS = -Wall -O2 -fomit-frame-pointer $(OMPFLAGS_MAYBE) -DSKIP_MEMZERO
 CFLAGS = -Wall -O2 -march=native -fomit-frame-pointer $(OMPFLAGS_MAYBE) -DSKIP_MEMZERO
-#CFLAGS = -Wall -O2 -funroll-loops -fomit-frame-pointer $(OMPFLAGS_MAYBE) -DSKIP_MEMZERO
-#CFLAGS = -Wall -O2 -march=native -funroll-loops -fomit-frame-pointer $(OMPFLAGS_MAYBE) -DSKIP_MEMZERO
-# -lrt is for userom's use of clock_gettime()
 LDFLAGS = -s -lrt $(OMPFLAGS_MAYBE)
 
-PROJ = tests phc-test initrom userom
-OBJS_CORE = yescrypt-opt.o
+PROJ = tests
+CORE = yescrypt-opt
+LIB_CORE = lib$(CORE).so
+OBJS_CORE = $(CORE).o
 OBJS_COMMON = yescrypt-common.o sha256.o insecure_memzero.o
-OBJS_TESTS = $(OBJS_CORE) $(OBJS_COMMON) tests.o
-OBJS_PHC = $(OBJS_CORE) $(OBJS_COMMON) phc-test.o
-OBJS_INITROM = $(OBJS_CORE) $(OBJS_COMMON) initrom.o
-OBJS_USEROM = $(OBJS_CORE) $(OBJS_COMMON) userom.o
+OBJS_TESTS = $(OBJS_COMMON) tests.o
+LDLIBS = -L. -l$(CORE)
 OBJS_RM = yescrypt-*.o
+TESTS_FILE = TESTS-OPT.log
 
 all: $(PROJ)
 
-check: tests phc-test
+check: tests
 	@echo 'Running main tests'
-	@time ./tests | tee TESTS-OUT
-	@diff -U0 TESTS-OK TESTS-OUT && echo PASSED || echo FAILED
-	@if [ -e PHC-TEST-OK-SHA256 ]; then \
-		echo 'Running PHC tests'; \
-		time ./phc-test > PHC-TEST-OUT; \
-		sha256sum -c PHC-TEST-OK-SHA256; \
-	fi
+	@time ./tests | tee $(TESTS_FILE)
 
 ref:
-	$(MAKE) $(PROJ) OBJS_CORE=yescrypt-ref.o
+	$(MAKE) $(PROJ) CORE=yescrypt-ref
 
 check-ref:
-	$(MAKE) check OBJS_CORE=yescrypt-ref.o
+	$(MAKE) check CORE=yescrypt-ref TESTS_FILE=TESTS-REF.log 
 
-tests: $(OBJS_TESTS)
-	$(LD) $(LDFLAGS) $(OBJS_TESTS) -o $@
-
-phc-test.o: phc.c
-	$(CC) -c $(CFLAGS) -DTEST phc.c -o $@
-
-phc-test: $(OBJS_PHC)
-	$(LD) $(LDFLAGS) $(OBJS_PHC) -o $@
-
-initrom: $(OBJS_INITROM)
-	$(LD) $(LDFLAGS) $(OBJS_INITROM) -o $@
-
-userom: $(OBJS_USEROM)
-	$(LD) $(LDFLAGS) $(OMPFLAGS) $(OBJS_USEROM) -o $@
-
-userom.o: userom.c
-	$(CC) -c $(CFLAGS) $(OMPFLAGS) $*.c
+tests: $(OBJS_TESTS) $(LIB_CORE)
+	export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
+	$(LD) $(LDFLAGS) $(OBJS_TESTS) $(LDLIBS) -o $@
 
 .c.o:
-	$(CC) -c $(CFLAGS) $*.c
+	$(CC) -c $(CFLAGS) -fPIC $*.c
 
 yescrypt-opt.o: yescrypt-platform.c
 
+$(LIB_CORE): $(OBJS_CORE)
+	$(CC) -shared -o $@ $<
+
 clean:
 	$(RM) $(PROJ)
-	$(RM) $(OBJS_TESTS) $(OBJS_PHC) $(OBJS_INITROM) $(OBJS_USEROM)
+	$(RM) $(OBJS_TESTS)
 	$(RM) $(OBJS_RM)
 	$(RM) TESTS-OUT PHC-TEST-OUT
+	$(RM) libyescrypt-opt.so
+	$(RM) libyescrypt-ref.so
