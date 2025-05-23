@@ -5,12 +5,25 @@
 #define CACHE_SETS 32768
 #define L3_ASSOC 12
 #define L3_SIZE 25165824
-#define REDUNDANCY 5
+#define REDUNDANCY 2
 #define BUF_SIZE L3_SIZE*REDUNDANCY
 #define THERESHOLD 100
-#define POTENTIAL_LINES BUF_SIZE / (2<<17)
+#define POTENTIAL_LINES BUF_SIZE / (2<<16)
 
 #define REPEAT 5
+
+int contains(void **A, size_t A_size, void *elem) {
+    int found = 0;
+    int i = 0;
+    while (!found && i<A_size) {
+        if (A[i] == elem) 
+            found = 1;
+
+        i++;
+    }
+    return found;
+}
+
 
 void set_subtraction(void **A, size_t A_size, void **B, size_t B_size, void *C) {
     int C_size=0;
@@ -44,8 +57,8 @@ void shuffle(void **array, size_t n)
 
 void get_potential_conflict_lines(void *buf, void **potential_conflict_lines, uint64_t set) {
     int i=0;
-    while (buf + (uint64_t)(i<<18) + (uint64_t)(set<<6) < buf+BUF_SIZE) {
-        potential_conflict_lines[i] = buf + (uint64_t)(i<<18) + (uint64_t)(set<<6);
+    while (buf + (uint64_t)(i<<17) + (uint64_t)(set<<6) < buf+BUF_SIZE) {
+        potential_conflict_lines[i] = buf + (uint64_t)(i<<17) + (uint64_t)(set<<6);
         i++;
     }
 
@@ -96,7 +109,7 @@ int main() {
     void *potential_conflict_lines[POTENTIAL_LINES];
     
     get_potential_conflict_lines(buf, potential_conflict_lines, 0x0);
-    shuffle(potential_conflict_lines, BUF_SIZE / (2<<17));
+    shuffle(potential_conflict_lines, POTENTIAL_LINES);
     
     size_t conflict_set_size = 0;
     void *conflict_set[POTENTIAL_LINES];
@@ -108,13 +121,13 @@ int main() {
         }
     }
 
-    printf("lines: %d\n", BUF_SIZE / (2<<17));
+    printf("lines: %d\n", POTENTIAL_LINES);
     printf("conflict_set_size: %d\n", conflict_set_size);
 
     //void *potential_conflict_lines2[POTENTIAL_LINES];
     //
     //get_potential_conflict_lines(buf, potential_conflict_lines2, 0x0);
-    //shuffle(potential_conflict_lines2, BUF_SIZE / (2<<17));
+    //shuffle(potential_conflict_lines2, POTENTIAL_LINES);
     //
     //size_t conflict_set_size2 = 0;
     //void *conflict_set2[POTENTIAL_LINES];
@@ -127,13 +140,13 @@ int main() {
     //}
     //
     //
-    //printf("lines: %d\n", BUF_SIZE / (2<<17));
+    //printf("lines: %d\n", POTENTIAL_LINES);
     //printf("conflict_set_size: %d\n", conflict_set_size2);
     //
     //for (int i=0; i<192; i++) {
     //    printf("%p\t%p\n", conflict_set[i], conflict_set2[i]);
     //}
-#if 1
+#if 0
 
     return 0;
 }
@@ -142,21 +155,26 @@ int main() {
     void *not_conflict_set[POTENTIAL_LINES - conflict_set_size];
     set_subtraction(potential_conflict_lines, POTENTIAL_LINES, conflict_set, conflict_set_size, not_conflict_set);
 
-    for (int i = 0; i < POTENTIAL_LINES - conflict_set_size; i++) {
-        void *candidate = not_conflict_set[i];
-        if (probe(conflict_set, conflict_set_size, candidate)) {
-            int eviction_set_size = 0;
-            for (int j=0; j<conflict_set_size; j++) {
-                if (!probe2(conflict_set, conflict_set_size, candidate, conflict_set[j])) {
-                    eviction_set_size++;
+    int eviction_set_size = 0;
+    void * eviction_set[30];
+    for (int r; r<10; r++) {
+        for (int i = 0; i < POTENTIAL_LINES - conflict_set_size; i++) {
+            void *candidate = not_conflict_set[i];
+            if (probe(conflict_set, conflict_set_size, candidate)) {
+                for (int j=0; j<conflict_set_size; j++) {
+                    if (!contains(eviction_set, eviction_set_size, conflict_set[j]) 
+                        &&!probe2(conflict_set, conflict_set_size, candidate, conflict_set[j])) {
+                        eviction_set[eviction_set_size++] = conflict_set[j];
+                    }
                 }
             }
-            printf("eviction_set_size: %d\n", eviction_set_size);
+            break;
         }
-        break;
-        
     }
-    
+    printf("eviction_set_size: %d\n", eviction_set_size);
+    for (int e=0; e<eviction_set_size; e++) {
+        printf("%p\n", eviction_set[e]);
+    }
 
 }
 #endif
